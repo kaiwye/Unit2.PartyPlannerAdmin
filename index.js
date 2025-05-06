@@ -1,6 +1,6 @@
 // === Constants ===
 const BASE = "https://fsa-crud-2aa9294fe819.herokuapp.com/api";
-const COHORT = ""; // Make sure to change this!
+const COHORT = "/2504-FTB-ET-WEB-FT";
 const API = BASE + COHORT;
 
 // === State ===
@@ -24,6 +24,8 @@ async function getParties() {
 /** Updates state with a single party from the API */
 async function getParty(id) {
   try {
+    if (rsvps.length === 0) await getRsvps();
+    if (guests.length === 0) await getRsvps();
     const response = await fetch(API + "/events/" + id);
     const result = await response.json();
     selectedParty = result.data;
@@ -39,7 +41,7 @@ async function getRsvps() {
     const response = await fetch(API + "/rsvps");
     const result = await response.json();
     rsvps = result.data;
-    render();
+    return rsvps;
   } catch (e) {
     console.error(e);
   }
@@ -51,7 +53,31 @@ async function getGuests() {
     const response = await fetch(API + "/guests");
     const result = await response.json();
     guests = result.data;
-    render();
+    return guests;
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function addParty(party) {
+  try {
+    await fetch(API + "/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(party),
+    });
+    await getParties();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function removeParty(id) {
+  try {
+    await fetch(`${API}/events/${id}`, {
+      method: "DELETE",
+    });
+    await getParties();
   } catch (e) {
     console.error(e);
   }
@@ -101,9 +127,14 @@ function SelectedParty() {
     </time>
     <address>${selectedParty.location}</address>
     <p>${selectedParty.description}</p>
+    <h3>Guests Who RSVPed: </h3>
     <GuestList></GuestList>
+    <button>Remove Party</button>
   `;
   $party.querySelector("GuestList").replaceWith(GuestList());
+
+  const $delete = $party.querySelector("button");
+  $delete.addEventListener("click", () => removeParty(selectedParty.id));
 
   return $party;
 }
@@ -111,6 +142,7 @@ function SelectedParty() {
 /** List of guests attending the selected party */
 function GuestList() {
   const $ul = document.createElement("ul");
+
   const guestsAtParty = guests.filter((guest) =>
     rsvps.find(
       (rsvp) => rsvp.guestId === guest.id && rsvp.eventId === selectedParty.id
@@ -128,6 +160,44 @@ function GuestList() {
   return $ul;
 }
 
+// === New Party Form ===
+function newPartyForm() {
+  const $form = document.createElement("form");
+  $form.innerHTML = `
+  <label>
+    Name
+    <input name="name" required/>
+  </label>
+  <label>
+    Date
+    <input name="date" type="date" required/>
+  </label>
+  <label>
+    Location
+    <input name="location" required/>
+  </label>
+  <label>
+    Description
+    <input name="description" type="text" required/>
+  </label>
+  <button>Create New Party</button>
+  `;
+
+  $form.addEventListener("submit", async (party) => {
+    party.preventDefault();
+
+    const data = new FormData($form);
+
+    await addParty({
+      name: data.get("name"),
+      date: new Date(data.get("date")).toISOString(),
+      location: data.get("location"),
+      description: data.get("description"),
+    });
+  });
+  return $form;
+}
+
 // === Render ===
 function render() {
   const $app = document.querySelector("#app");
@@ -137,6 +207,8 @@ function render() {
       <section>
         <h2>Upcoming Parties</h2>
         <PartyList></PartyList>
+        <h3>Create a New Party</h3>
+        <NewPartyForm></NewPartyForm>
       </section>
       <section id="selected">
         <h2>Party Details</h2>
@@ -146,6 +218,7 @@ function render() {
   `;
 
   $app.querySelector("PartyList").replaceWith(PartyList());
+  $app.querySelector("NewPartyForm").replaceWith(newPartyForm());
   $app.querySelector("SelectedParty").replaceWith(SelectedParty());
 }
 
